@@ -1,3 +1,8 @@
+image-worker:
+  base-url: https://dev.realteeth.ai
+  candidate-name: 이주환
+  email: jhan0121@gmail.com
+
 spring:
   application:
     name: image-processing
