@@ -27,11 +27,11 @@ public interface JobControllerDocs {
 
     @Operation(
             summary = "작업 등록",
-            description = "이미지 처리 작업을 비동기로 등록합니다. 처리는 백그라운드에서 진행되며 jobId를 즉시 반환합니다."
+            description = "이미지 처리 작업을 등록합니다. jobId를 즉시 반환하며, Worker 서버 등록은 트랜잭션 커밋 후 비동기로 수행됩니다."
     )
     @ApiResponses({
             @ApiResponse(responseCode = "202",
-                    description = "작업 생성 성공 (신규 등록)"),
+                    description = "작업 접수 성공 (신규 등록). Worker 등록은 비동기로 진행되며 status 폴링으로 진행 상황을 확인하세요."),
             @ApiResponse(responseCode = "200",
                     description = "중복 요청 - 동일 Idempotency-Key의 기존 작업 반환"),
             @ApiResponse(responseCode = "400",
