@@ -14,6 +14,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import jakarta.persistence.Version;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
@@ -22,7 +23,12 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 @Entity
-@Table(name = "jobs")
+@Table(
+        name = "jobs",
+        uniqueConstraints = {
+                @UniqueConstraint(columnNames = { "idempotency_key", "user_id" })
+        }
+)
 @Getter
 @Builder
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
@@ -39,9 +45,10 @@ public class Job {
     @Column(unique = true, nullable = false)
     private UUID jobId;
 
-    @Column(unique = true, nullable = false)
+    @Column(nullable = false)
     private String idempotencyKey;
 
+    @Column(nullable = false)
     private String userId;
 
     @Column(length = 2048, nullable = false)

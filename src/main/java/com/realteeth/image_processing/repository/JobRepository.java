@@ -17,7 +17,7 @@ public interface JobRepository extends JpaRepository<Job, Long> {
 
     Optional<Job> findByJobId(UUID jobId);
 
-    Optional<Job> findByIdempotencyKey(String idempotencyKey);
+    Optional<Job> findByIdempotencyKeyAndUserId(String idempotencyKey, String userId);
 
     List<Job> findByStatus(JobStatus status);
 

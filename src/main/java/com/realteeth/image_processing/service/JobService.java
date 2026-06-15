@@ -28,7 +28,7 @@ public class JobService {
 
     @Transactional
     public SubmitJobResult submitJob(String idempotencyKey, String imageUrl, String userId) {
-        return jobRepository.findByIdempotencyKey(idempotencyKey)
+        return jobRepository.findByIdempotencyKeyAndUserId(idempotencyKey, userId)
                             .map(existing -> {
                                 log.info("중복 요청 처리: idempotencyKey={}", idempotencyKey);
                                 return new SubmitJobResult(JobData.from(existing), false);

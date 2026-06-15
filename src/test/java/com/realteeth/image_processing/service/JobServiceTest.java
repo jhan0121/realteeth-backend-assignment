@@ -60,7 +60,7 @@ class JobServiceTest {
 
         @BeforeEach
         void setUp() {
-            when(jobRepository.findByIdempotencyKey("key-001")).thenReturn(Optional.empty());
+            when(jobRepository.findByIdempotencyKeyAndUserId("key-001", "user-1")).thenReturn(Optional.empty());
             when(jobRepository.save(any(Job.class))).thenAnswer(inv -> inv.getArgument(0));
         }
 
@@ -102,7 +102,7 @@ class JobServiceTest {
         @DisplayName("중복 idempotencyKey이면 기존 Job의 jobId를 반환하고 created는 false이다")
         void submitJob_duplicateIdempotencyKey_returnsExistingJobIdAndCreatedFalse() {
             Job existing = pendingJob("key-001");
-            when(jobRepository.findByIdempotencyKey("key-001")).thenReturn(Optional.of(existing));
+            when(jobRepository.findByIdempotencyKeyAndUserId("key-001", "user-1")).thenReturn(Optional.of(existing));
 
             SubmitJobResult result = jobService.submitJob("key-001", "https://example.com/image.jpg", "user-1");
 
@@ -116,7 +116,7 @@ class JobServiceTest {
         @DisplayName("중복 idempotencyKey이면 새 Job을 저장하지 않는다")
         void submitJob_duplicateIdempotencyKey_doesNotSaveNewJob() {
             Job existing = pendingJob("key-001");
-            when(jobRepository.findByIdempotencyKey("key-001")).thenReturn(Optional.of(existing));
+            when(jobRepository.findByIdempotencyKeyAndUserId("key-001", "user-1")).thenReturn(Optional.of(existing));
 
             jobService.submitJob("key-001", "https://example.com/image.jpg", "user-1");
 
@@ -127,7 +127,7 @@ class JobServiceTest {
         @DisplayName("중복 idempotencyKey이면 이벤트를 발행하지 않는다")
         void submitJob_duplicateIdempotencyKey_doesNotPublishEvent() {
             Job existing = pendingJob("key-001");
-            when(jobRepository.findByIdempotencyKey("key-001")).thenReturn(Optional.of(existing));
+            when(jobRepository.findByIdempotencyKeyAndUserId("key-001", "user-1")).thenReturn(Optional.of(existing));
 
             jobService.submitJob("key-001", "https://example.com/image.jpg", "user-1");
 
