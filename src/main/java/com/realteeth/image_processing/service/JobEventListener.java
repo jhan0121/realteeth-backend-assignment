@@ -50,12 +50,14 @@ public class JobEventListener {
     }
 
     private void registerToWorker(UUID jobId) {
-        Job job = jobRepository.findByJobId(jobId)
-                               .orElseThrow(() -> new IllegalStateException("Job 미발견: " + jobId));
-
-        if (!job.isPending()) {
+        int claimed = jobRepository.tryClaimJob(jobId);
+        if (claimed == 0) {
+            log.info("이미 다른 스레드가 처리 중: jobId={}", jobId);
             return;
         }
+
+        Job job = jobRepository.findByJobId(jobId)
+                               .orElseThrow(() -> new IllegalStateException("Job 미발견: " + jobId));
 
         try {
             ProcessStartResponse startResponse = imageWorkerClient.startProcessing(job.getImageUrl());

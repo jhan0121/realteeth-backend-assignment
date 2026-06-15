@@ -54,10 +54,14 @@ public class ImageWorkerClient implements SmartInitializingSingleton {
 
     public ProcessStatusResponse pollStatus(String workerJobId) {
         try {
-            return restClient.get()
-                             .uri("/mock/process/{jobId}", workerJobId)
-                             .retrieve()
-                             .body(ProcessStatusResponse.class);
+            ProcessStatusResponse response = restClient.get()
+                                                       .uri("/mock/process/{jobId}", workerJobId)
+                                                       .retrieve()
+                                                       .body(ProcessStatusResponse.class);
+            if (response == null) {
+                throw new ImageWorkerException("Worker 빈 응답: workerJobId=" + workerJobId);
+            }
+            return response;
         } catch (HttpClientErrorException.NotFound e) {
             throw new WorkerJobLostException(workerJobId);
         }

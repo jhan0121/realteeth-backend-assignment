@@ -5,6 +5,7 @@ import java.time.Instant;
 import java.util.concurrent.Executor;
 
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -44,6 +45,8 @@ public class JobPollingScheduler {
                      .forEach(job -> executor.execute(() -> {
                          try {
                              checkJobStatus(job);
+                         } catch (ObjectOptimisticLockingFailureException e) {
+                             log.warn("낙관적 락 충돌 - 다른 스레드가 먼저 처리 완료: jobId={}", job.getJobId());
                          } catch (Exception e) {
                              log.error("폴링 중 예외 발생: jobId={}", job.getJobId(), e);
                          }
@@ -79,8 +82,8 @@ public class JobPollingScheduler {
             log.info("Job 완료: jobId={}", job.getJobId());
         } else if (STATUS_FAILED.equals(statusResponse.status())) {
             String errorMessage = statusResponse.result() != null
-                    ? statusResponse.result()
-                    : "Worker 처리 실패";
+                                  ? statusResponse.result()
+                                  : "Worker 처리 실패";
             job.fail(errorMessage);
             jobRepository.save(job);
             log.warn("Job 실패: jobId={}", job.getJobId());

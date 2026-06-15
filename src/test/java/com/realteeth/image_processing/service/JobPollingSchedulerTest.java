@@ -8,6 +8,8 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
+
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.time.Instant;
@@ -273,6 +275,24 @@ class JobPollingSchedulerTest {
             scheduler.pollProcessingJobs();
 
             verify(jobRepository, never()).save(any());
+        }
+    }
+
+    @Nested
+    @DisplayName("pollProcessingJobs() - 낙관적 잠금 충돌 처리")
+    class OptimisticLockingHandling {
+
+        @Test
+        @DisplayName("낙관적 잠금 충돌 시 예외가 외부로 전파되지 않는다")
+        void pollProcessingJobs_optimisticLockingConflict_exceptionNotPropagated() {
+            Job job = processingJob();
+            when(jobRepository.findByStatus(JobStatus.PROCESSING)).thenReturn(List.of(job));
+            when(imageWorkerClient.pollStatus("worker-job-1"))
+                    .thenReturn(new ProcessStatusResponse("worker-job-1", "COMPLETED", "result"));
+            when(jobRepository.save(any()))
+                    .thenThrow(new ObjectOptimisticLockingFailureException(Job.class, job.getJobId()));
+
+            assertThatCode(() -> scheduler.pollProcessingJobs()).doesNotThrowAnyException();
         }
     }
 }
