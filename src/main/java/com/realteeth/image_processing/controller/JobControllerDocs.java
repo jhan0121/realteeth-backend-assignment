@@ -21,6 +21,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Size;
 
 @Tag(name = "Jobs", description = "이미지 처리 작업 관리 API")
 public interface JobControllerDocs {
@@ -40,7 +41,7 @@ public interface JobControllerDocs {
     ResponseEntity<CommonApiResponse<JobResponse>> submitJob(
             @Parameter(description = "멱등성 키 - 동일 키 재요청 시 기존 결과 반환", required = true,
                     example = "550e8400-e29b-41d4-a716-446655440000")
-            @RequestHeader("Idempotency-Key") String idempotencyKey,
+            @RequestHeader("Idempotency-Key") @Size(max = 255, message = "Idempotency-Key는 255자를 초과할 수 없습니다") String idempotencyKey,
             @RequestBody @Valid CreateJobRequest request
     );
 
