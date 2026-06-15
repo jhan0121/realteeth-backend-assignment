@@ -15,7 +15,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.realteeth.image_processing.controller.dto.request.CreateJobRequest;
-import com.realteeth.image_processing.controller.dto.response.ApiResponse;
+import com.realteeth.image_processing.controller.dto.response.CommonApiResponse;
 import com.realteeth.image_processing.controller.dto.response.JobResponse;
 import com.realteeth.image_processing.controller.dto.response.PagedJobResponse;
 import com.realteeth.image_processing.service.JobService;
@@ -27,27 +27,27 @@ import lombok.RequiredArgsConstructor;
 @RestController
 @RequestMapping("/api/v1/jobs")
 @RequiredArgsConstructor
-public class JobController {
+public class JobController implements JobControllerDocs {
 
     private final JobService jobService;
 
     @PostMapping
-    public ResponseEntity<ApiResponse<JobResponse>> submitJob(
+    public ResponseEntity<CommonApiResponse<JobResponse>> submitJob(
             @RequestHeader("Idempotency-Key") String idempotencyKey,
             @RequestBody @Valid CreateJobRequest request) {
         SubmitJobResult result = jobService.submitJob(idempotencyKey, request.imageUrl(), request.userId());
         HttpStatus status = result.created() ? HttpStatus.ACCEPTED : HttpStatus.OK;
-        return ResponseEntity.status(status).body(ApiResponse.ok(JobResponse.from(result.job())));
+        return ResponseEntity.status(status).body(CommonApiResponse.ok(JobResponse.from(result.job())));
     }
 
     @GetMapping("/{jobId}")
-    public ResponseEntity<ApiResponse<JobResponse>> getJob(@PathVariable UUID jobId) {
-        return ResponseEntity.ok(ApiResponse.ok(JobResponse.from(jobService.getJob(jobId))));
+    public ResponseEntity<CommonApiResponse<JobResponse>> getJob(@PathVariable UUID jobId) {
+        return ResponseEntity.ok(CommonApiResponse.ok(JobResponse.from(jobService.getJob(jobId))));
     }
 
     @GetMapping
-    public ResponseEntity<ApiResponse<PagedJobResponse>> listJobs(
+    public ResponseEntity<CommonApiResponse<PagedJobResponse>> listJobs(
             @PageableDefault(size = 20) Pageable pageable) {
-        return ResponseEntity.ok(ApiResponse.ok(PagedJobResponse.from(jobService.listJobs(pageable))));
+        return ResponseEntity.ok(CommonApiResponse.ok(PagedJobResponse.from(jobService.listJobs(pageable))));
     }
 }
