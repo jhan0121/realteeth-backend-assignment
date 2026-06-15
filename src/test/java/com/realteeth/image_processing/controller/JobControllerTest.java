@@ -151,6 +151,70 @@ class JobControllerTest {
                     .statusCode(400)
                     .body("success", equalTo(false));
         }
+
+        @Test
+        @DisplayName("imageUrl이 프로토콜 없는 일반 문자열이면 400을 반환한다")
+        void submitJob_plainTextImageUrl_returns400() {
+            given()
+                    .contentType(ContentType.JSON)
+                    .header("Idempotency-Key", "key-invalid-url-text")
+                    .body("""
+                                  {"imageUrl": "not-a-url", "userId": "user-1"}
+                                  """)
+                    .when()
+                    .post("/api/v1/jobs")
+                    .then()
+                    .statusCode(400)
+                    .body("success", equalTo(false));
+        }
+
+        @Test
+        @DisplayName("imageUrl이 스킴 없는 도메인 형태이면 400을 반환한다")
+        void submitJob_domainWithoutSchemeImageUrl_returns400() {
+            given()
+                    .contentType(ContentType.JSON)
+                    .header("Idempotency-Key", "key-invalid-url-domain")
+                    .body("""
+                                  {"imageUrl": "example.com/image.jpg", "userId": "user-1"}
+                                  """)
+                    .when()
+                    .post("/api/v1/jobs")
+                    .then()
+                    .statusCode(400)
+                    .body("success", equalTo(false));
+        }
+
+        @Test
+        @DisplayName("imageUrl이 https로 시작하는 올바른 URL이면 202를 반환한다")
+        void submitJob_validHttpsImageUrl_returns202() {
+            given()
+                    .contentType(ContentType.JSON)
+                    .header("Idempotency-Key", "key-valid-url")
+                    .body("""
+                                  {"imageUrl": "https://example.com/image.jpg", "userId": "user-1"}
+                                  """)
+                    .when()
+                    .post("/api/v1/jobs")
+                    .then()
+                    .statusCode(202)
+                    .body("success", equalTo(true));
+        }
+
+        @Test
+        @DisplayName("imageUrl이 http로 시작하는 올바른 URL이면 202를 반환한다")
+        void submitJob_validHttpImageUrl_returns202() {
+            given()
+                    .contentType(ContentType.JSON)
+                    .header("Idempotency-Key", "key-valid-http-url")
+                    .body("""
+                                  {"imageUrl": "http://example.com/image.jpg", "userId": "user-1"}
+                                  """)
+                    .when()
+                    .post("/api/v1/jobs")
+                    .then()
+                    .statusCode(202)
+                    .body("success", equalTo(true));
+        }
     }
 
     @Nested
