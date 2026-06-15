@@ -215,6 +215,23 @@ class JobControllerTest {
                     .statusCode(202)
                     .body("success", equalTo(true));
         }
+
+        @Test
+        @DisplayName("Idempotency-Key가 255자를 초과하면 400을 반환한다")
+        void submitJob_idempotencyKeyExceeds255Chars_returns400() {
+            String oversizedKey = "k".repeat(256);
+            given()
+                    .contentType(ContentType.JSON)
+                    .header("Idempotency-Key", oversizedKey)
+                    .body("""
+                                  {"imageUrl": "https://example.com/image.jpg", "userId": "user-1"}
+                                  """)
+                    .when()
+                    .post("/api/v1/jobs")
+                    .then()
+                    .statusCode(400)
+                    .body("success", equalTo(false));
+        }
     }
 
     @Nested

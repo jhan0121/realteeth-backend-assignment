@@ -12,6 +12,9 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 
 import com.realteeth.image_processing.controller.dto.response.CommonApiResponse;
 
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.ConstraintViolationException;
+
 import lombok.extern.slf4j.Slf4j;
 
 @RestControllerAdvice
@@ -28,6 +31,15 @@ public class GlobalExceptionHandler {
     public ResponseEntity<CommonApiResponse<Void>> handleValidation(MethodArgumentNotValidException ex) {
         List<String> details = ex.getBindingResult().getFieldErrors().stream()
                                  .map(e -> e.getField() + ": " + e.getDefaultMessage())
+                                 .toList();
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                             .body(CommonApiResponse.errors("입력값이 유효하지 않습니다", details));
+    }
+
+    @ExceptionHandler(ConstraintViolationException.class)
+    public ResponseEntity<CommonApiResponse<Void>> handleConstraintViolation(ConstraintViolationException ex) {
+        List<String> details = ex.getConstraintViolations().stream()
+                                 .map(ConstraintViolation::getMessage)
                                  .toList();
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                              .body(CommonApiResponse.errors("입력값이 유효하지 않습니다", details));
