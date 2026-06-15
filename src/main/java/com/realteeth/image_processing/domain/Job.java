@@ -73,12 +73,14 @@ public class Job {
 
     public void startProcessing(String workerJobId) {
         rejectIfAlreadyTerminated(JobStatus.PROCESSING);
+        rejectIfAlreadyProcessing();
         this.status = JobStatus.PROCESSING;
         this.processingContext = ProcessingContext.processing(workerJobId);
     }
 
     public void complete(String result) {
         rejectIfAlreadyTerminated(JobStatus.COMPLETED);
+        rejectIfStillPending();
         this.status = JobStatus.COMPLETED;
         this.processingContext = ProcessingContext.completed(processingContext.getWorkerJobId(), result);
     }
@@ -98,6 +100,18 @@ public class Job {
         if (status == JobStatus.COMPLETED || status == JobStatus.FAILED) {
             throw new IllegalStateException(
                     "종료된 상태(%s)에서 %s로 전이할 수 없습니다.".formatted(status, target));
+        }
+    }
+
+    private void rejectIfAlreadyProcessing() {
+        if (status == JobStatus.PROCESSING) {
+            throw new IllegalStateException("이미 PROCESSING인 Job입니다.");
+        }
+    }
+
+    private void rejectIfStillPending() {
+        if (status == JobStatus.PENDING) {
+            throw new IllegalStateException("PENDING 상태에서 COMPLETED로 전이할 수 없습니다.");
         }
     }
 

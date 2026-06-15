@@ -115,6 +115,16 @@ class JobTest {
         }
 
         @Test
+        @DisplayName("이미 PROCESSING 상태이면 IllegalStateException이 발생한다")
+        void startProcessing_whenProcessing_throwsIllegalStateException() {
+            Job job = processingJob();
+
+            assertThatThrownBy(() -> job.startProcessing("worker-job-2"))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("PROCESSING");
+        }
+
+        @Test
         @DisplayName("이미 COMPLETED 상태이면 IllegalStateException이 발생한다")
         void startProcessing_whenCompleted_throwsIllegalStateException() {
             Job job = processingJob();
@@ -180,6 +190,16 @@ class JobTest {
             job.complete("처리 결과");
 
             assertThat(job.getProcessingContext().getErrorMessage()).isNull();
+        }
+
+        @Test
+        @DisplayName("PENDING 상태에서 complete()를 호출하면 IllegalStateException이 발생한다")
+        void complete_whenPending_throwsIllegalStateException() {
+            Job job = pendingJob();
+
+            assertThatThrownBy(() -> job.complete("처리 결과"))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("PENDING");
         }
 
         @Test
