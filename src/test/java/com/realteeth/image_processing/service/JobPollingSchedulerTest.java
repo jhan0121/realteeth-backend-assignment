@@ -99,11 +99,13 @@ class JobPollingSchedulerTest {
     class TimeoutHandling {
 
         @Test
-        @DisplayName("updatedAt이 5분을 초과한 Job은 FAILED 상태가 된다")
+        @DisplayName("updatedAt이 5분을 초과하고 Worker가 PROCESSING이면 FAILED 상태가 된다")
         void pollProcessingJobs_timedOutJob_statusBecomeFailed() {
             Job job = processingJob();
             setUpdatedAt(job, Instant.now().minus(6, ChronoUnit.MINUTES));
             when(jobRepository.findByStatus(JobStatus.PROCESSING)).thenReturn(List.of(job));
+            when(imageWorkerClient.pollStatus("worker-job-1"))
+                    .thenReturn(new ProcessStatusResponse("worker-job-1", "PROCESSING", null));
             when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
             scheduler.pollProcessingJobs();
@@ -119,6 +121,8 @@ class JobPollingSchedulerTest {
             Job job = processingJob();
             setUpdatedAt(job, Instant.now().minus(6, ChronoUnit.MINUTES));
             when(jobRepository.findByStatus(JobStatus.PROCESSING)).thenReturn(List.of(job));
+            when(imageWorkerClient.pollStatus("worker-job-1"))
+                    .thenReturn(new ProcessStatusResponse("worker-job-1", "PROCESSING", null));
             when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
             scheduler.pollProcessingJobs();
@@ -126,6 +130,23 @@ class JobPollingSchedulerTest {
             ArgumentCaptor<Job> captor = ArgumentCaptor.forClass(Job.class);
             verify(jobRepository).save(captor.capture());
             assertThat(captor.getValue().getProcessingContext().getErrorMessage()).contains("시간 초과");
+        }
+
+        @Test
+        @DisplayName("Worker가 COMPLETED를 반환하면 타임아웃이 지나도 COMPLETED 상태가 된다")
+        void pollProcessingJobs_completedResponseAfterTimeout_jobCompleted() {
+            Job job = processingJob();
+            setUpdatedAt(job, Instant.now().minus(6, ChronoUnit.MINUTES));
+            when(jobRepository.findByStatus(JobStatus.PROCESSING)).thenReturn(List.of(job));
+            when(imageWorkerClient.pollStatus("worker-job-1"))
+                    .thenReturn(new ProcessStatusResponse("worker-job-1", "COMPLETED", "result-data"));
+            when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+            scheduler.pollProcessingJobs();
+
+            ArgumentCaptor<Job> captor = ArgumentCaptor.forClass(Job.class);
+            verify(jobRepository).save(captor.capture());
+            assertThat(captor.getValue().getStatus()).isEqualTo(JobStatus.COMPLETED);
         }
     }
 

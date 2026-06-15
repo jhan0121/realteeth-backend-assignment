@@ -39,7 +39,7 @@ public class JobPollingScheduler {
         this.executor = executor;
     }
 
-    @Scheduled(fixedDelay = 5000)
+    @Scheduled(fixedRate = 5000)
     public void pollProcessingJobs() {
         jobRepository.findByStatus(JobStatus.PROCESSING)
                      .forEach(job -> executor.execute(() -> {
@@ -54,14 +54,6 @@ public class JobPollingScheduler {
     }
 
     private void checkJobStatus(Job job) {
-        Instant checkBoundaryTime = job.getUpdatedAt().plus(TIMEOUT);
-        if (checkBoundaryTime.isBefore(Instant.now())) {
-            job.fail("이미지 처리 서버 응답 시간 초과");
-            jobRepository.save(job);
-            log.warn("Job 타임아웃: jobId={}", job.getJobId());
-            return;
-        }
-
         String workerJobId = job.getProcessingContext().getWorkerJobId();
         ProcessStatusResponse statusResponse;
         try {
@@ -87,6 +79,13 @@ public class JobPollingScheduler {
             job.fail(errorMessage);
             jobRepository.save(job);
             log.warn("Job 실패: jobId={}", job.getJobId());
+        } else {
+            Instant checkBoundaryTime = job.getUpdatedAt().plus(TIMEOUT);
+            if (checkBoundaryTime.isBefore(Instant.now())) {
+                job.fail("이미지 처리 서버 응답 시간 초과");
+                jobRepository.save(job);
+                log.warn("Job 타임아웃: jobId={}", job.getJobId());
+            }
         }
     }
 }
