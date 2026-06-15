@@ -2,6 +2,7 @@ package com.realteeth.image_processing.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.SoftAssertions.assertSoftly;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -27,8 +28,10 @@ import org.springframework.data.domain.PageRequest;
 import com.realteeth.image_processing.domain.Job;
 import com.realteeth.image_processing.domain.JobStatus;
 import com.realteeth.image_processing.event.JobCreatedEvent;
+import com.realteeth.image_processing.exception.JobNotFoundException;
 import com.realteeth.image_processing.repository.JobRepository;
-import com.realteeth.image_processing.service.dto.JobResponse;
+import com.realteeth.image_processing.service.dto.JobData;
+import com.realteeth.image_processing.service.dto.SubmitJobResult;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("JobService")
@@ -80,11 +83,14 @@ class JobServiceTest {
         }
 
         @Test
-        @DisplayName("반환된 JobResponse의 status는 PENDING이다")
-        void submitJob_newIdempotencyKey_returnsPendingStatus() {
-            JobResponse response = jobService.submitJob("key-001", "https://example.com/image.jpg", "user-1");
+        @DisplayName("반환된 JobResponse의 status는 PENDING이고 created는 true이다")
+        void submitJob_newIdempotencyKey_returnsPendingStatusAndCreatedTrue() {
+            SubmitJobResult result = jobService.submitJob("key-001", "https://example.com/image.jpg", "user-1");
 
-            assertThat(response.status()).isEqualTo(JobStatus.PENDING);
+            assertSoftly(softly -> {
+                softly.assertThat(result.job().status()).isEqualTo(JobStatus.PENDING);
+                softly.assertThat(result.created()).isTrue();
+            });
         }
     }
 
@@ -93,14 +99,17 @@ class JobServiceTest {
     class SubmitDuplicateJob {
 
         @Test
-        @DisplayName("중복 idempotencyKey이면 기존 Job의 jobId를 반환한다")
-        void submitJob_duplicateIdempotencyKey_returnsExistingJobId() {
+        @DisplayName("중복 idempotencyKey이면 기존 Job의 jobId를 반환하고 created는 false이다")
+        void submitJob_duplicateIdempotencyKey_returnsExistingJobIdAndCreatedFalse() {
             Job existing = pendingJob("key-001");
             when(jobRepository.findByIdempotencyKey("key-001")).thenReturn(Optional.of(existing));
 
-            JobResponse response = jobService.submitJob("key-001", "https://example.com/image.jpg", "user-1");
+            SubmitJobResult result = jobService.submitJob("key-001", "https://example.com/image.jpg", "user-1");
 
-            assertThat(response.jobId()).isEqualTo(existing.getJobId());
+            assertSoftly(softly -> {
+                softly.assertThat(result.job().jobId()).isEqualTo(existing.getJobId());
+                softly.assertThat(result.created()).isFalse();
+            });
         }
 
         @Test
@@ -131,7 +140,7 @@ class JobServiceTest {
     class ListJobs {
 
         @Test
-        @DisplayName("Job이 존재하면 Page<JobResponse>를 반환한다")
+        @DisplayName("Job이 존재하면 Page<JobData>를 반환한다")
         void listJobs_withJobs_returnsPage() {
             Job job1 = pendingJob("key-001");
             Job job2 = pendingJob("key-002");
@@ -139,10 +148,12 @@ class JobServiceTest {
             when(jobRepository.findAll(pageable))
                     .thenReturn(new PageImpl<>(List.of(job1, job2), pageable, 2));
 
-            Page<JobResponse> page = jobService.listJobs(pageable);
+            Page<JobData> page = jobService.listJobs(pageable);
 
-            assertThat(page.getTotalElements()).isEqualTo(2);
-            assertThat(page.getContent()).hasSize(2);
+            assertSoftly(softly -> {
+                softly.assertThat(page.getTotalElements()).isEqualTo(2);
+                softly.assertThat(page.getContent()).hasSize(2);
+            });
         }
 
         @Test
@@ -152,10 +163,12 @@ class JobServiceTest {
             when(jobRepository.findAll(pageable))
                     .thenReturn(new PageImpl<>(List.of(), pageable, 0));
 
-            Page<JobResponse> page = jobService.listJobs(pageable);
+            Page<JobData> page = jobService.listJobs(pageable);
 
-            assertThat(page.getTotalElements()).isZero();
-            assertThat(page.getContent()).isEmpty();
+            assertSoftly(softly -> {
+                softly.assertThat(page.getTotalElements()).isZero();
+                softly.assertThat(page.getContent()).isEmpty();
+            });
         }
     }
 
@@ -164,24 +177,24 @@ class JobServiceTest {
     class GetJob {
 
         @Test
-        @DisplayName("존재하는 jobId이면 JobResponse를 반환한다")
-        void getJob_existingJobId_returnsJobResponse() {
+        @DisplayName("존재하는 jobId이면 JobData를 반환한다")
+        void getJob_existingJobId_returnsJobData() {
             Job job = pendingJob("key-001");
             when(jobRepository.findByJobId(job.getJobId())).thenReturn(Optional.of(job));
 
-            JobResponse response = jobService.getJob(job.getJobId());
+            JobData response = jobService.getJob(job.getJobId());
 
             assertThat(response.jobId()).isEqualTo(job.getJobId());
         }
 
         @Test
-        @DisplayName("존재하지 않는 jobId이면 IllegalArgumentException이 발생한다")
-        void getJob_unknownJobId_throwsIllegalArgumentException() {
+        @DisplayName("존재하지 않는 jobId이면 JobNotFoundException이 발생한다")
+        void getJob_unknownJobId_throwsJobNotFoundException() {
             UUID unknownId = UUID.randomUUID();
             when(jobRepository.findByJobId(unknownId)).thenReturn(Optional.empty());
 
             assertThatThrownBy(() -> jobService.getJob(unknownId))
-                    .isInstanceOf(IllegalArgumentException.class)
+                    .isInstanceOf(JobNotFoundException.class)
                     .hasMessageContaining(unknownId.toString());
         }
     }

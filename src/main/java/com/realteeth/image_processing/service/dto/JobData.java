@@ -7,7 +7,7 @@ import com.realteeth.image_processing.domain.Job;
 import com.realteeth.image_processing.domain.JobStatus;
 import com.realteeth.image_processing.domain.ProcessingContext;
 
-public record JobResponse(
+public record JobData(
         UUID jobId,
         String idempotencyKey,
         String userId,
@@ -19,9 +19,9 @@ public record JobResponse(
         Instant createdAt
 ) {
 
-    public static JobResponse from(Job job) {
+    public static JobData from(Job job) {
         ProcessingContext ctx = job.getProcessingContext();
-        return new JobResponse(
+        return new JobData(
                 job.getJobId(),
                 job.getIdempotencyKey(),
                 job.getUserId(),
