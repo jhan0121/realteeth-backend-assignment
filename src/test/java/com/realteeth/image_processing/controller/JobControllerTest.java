@@ -47,7 +47,7 @@ class JobControllerTest {
     @BeforeEach
     void setUp() {
         RestAssured.port = port;
-        jobRepository.deleteAll();
+        jobRepository.deleteAllInBatch();
         when(imageWorkerClient.startProcessing(any()))
                 .thenReturn(new ProcessStartResponse("worker-job-id", "PROCESSING"));
     }
