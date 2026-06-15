@@ -86,6 +86,10 @@ public class Job {
         this.processingContext = ProcessingContext.failed(currentWorkerJobId, errorMessage);
     }
 
+    public boolean isPending() {
+        return this.status == JobStatus.PENDING;
+    }
+
     private void rejectIfAlreadyTerminated(JobStatus target) {
         if (status == JobStatus.COMPLETED || status == JobStatus.FAILED) {
             throw new IllegalStateException(
