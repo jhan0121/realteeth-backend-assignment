@@ -1,6 +1,6 @@
 # Image Processing Job API
 
-Spring Boot 3.3 기반 비동기 이미지 처리 서비스입니다. 클라이언트 요청을 수신하여 외부 Mock Worker에 작업을 위임하고, 폴링으로 상태를 추적합니다.
+Spring Boot 3.5 기반 비동기 이미지 처리 서비스입니다. 클라이언트 요청을 수신하여 외부 Mock Worker에 작업을 위임하고, 폴링으로 상태를 추적합니다.
 
 ---
 
@@ -150,18 +150,18 @@ GET /api/v1/jobs?page=0&size=20
 
 ```mermaid
 flowchart TD
-    A["submitJob() — 트랜잭션 커밋"] -->|"JobCreatedEvent 발행"| B
+    A["submitJob() — 트랜잭션 커밋"] -->|" JobCreatedEvent 발행 "| B
 
     subgraph REG ["① Worker 등록"]
         B["@TransactionalEventListener\nAFTER_COMMIT"] --> C["JobEventListener.onJobCreated()\n@Async 스레드"]
-        C -->|"POST /mock/process"| D["workerJobId 저장\nPENDING → PROCESSING"]
+        C -->|" POST /mock/process "| D["workerJobId 저장\nPENDING → PROCESSING"]
     end
 
     subgraph POLL ["② 상태 폴링 — @Scheduled fixedRate=5000ms"]
-        E["JobPollingScheduler.pollProcessingJobs()"] -->|"DB 조회: PROCESSING 전체"| F{"GET /mock/process/{workerJobId}"}
+        E["JobPollingScheduler.pollProcessingJobs()"] -->|" DB 조회: PROCESSING 전체 "| F{"GET /mock/process/{workerJobId}"}
         F -->|COMPLETED| G1["COMPLETED"]
-        F -->|"FAILED / WorkerJobLostException"| G2["FAILED"]
-        F -->|"여전히 PROCESSING\n+ 5분 초과"| G3["타임아웃 → FAILED"]
+        F -->|" FAILED / WorkerJobLostException "| G2["FAILED"]
+        F -->|" 여전히 PROCESSING\n+ 5분 초과 "| G3["타임아웃 → FAILED"]
     end
 ```
 
@@ -181,11 +181,11 @@ Job을 안전하게 읽을 수 있도록 보장합니다.
 
 ```mermaid
 stateDiagram-v2
-    [*] --> PENDING : 요청 수신
-    PENDING --> PROCESSING : Worker 등록 성공
-    PENDING --> FAILED : Worker 등록 실패
-    PROCESSING --> COMPLETED : Worker 처리 완료
-    PROCESSING --> FAILED : Worker 실패 / 타임아웃
+    [*] --> PENDING: 요청 수신
+    PENDING --> PROCESSING: Worker 등록 성공
+    PENDING --> FAILED: Worker 등록 실패
+    PROCESSING --> COMPLETED: Worker 처리 완료
+    PROCESSING --> FAILED: Worker 실패 / 타임아웃
     COMPLETED --> [*]
     FAILED --> [*]
 ```
@@ -206,10 +206,10 @@ PROCESSING Job의 타임아웃 판단 순서가 중요합니다.
 
 ```mermaid
 flowchart LR
-    A["Worker 조회"] -->|"COMPLETED / FAILED"| B["해당 상태 전이"]
-    A -->|"여전히 PROCESSING"| C["타임아웃 체크"]
-    C -->|"5분 초과"| D["FAILED"]
-    C -->|"5분 미초과"| E["다음 틱까지 대기"]
+    A["Worker 조회"] -->|" COMPLETED / FAILED "| B["해당 상태 전이"]
+    A -->|" 여전히 PROCESSING "| C["타임아웃 체크"]
+    C -->|" 5분 초과 "| D["FAILED"]
+    C -->|" 5분 미초과 "| E["다음 틱까지 대기"]
 ```
 
 이미지 처리는 비용이 크고 시간이 많이 소요됩니다. Worker가 이미 처리를 완료했음에도 `updatedAt`이 오래됐다는 이유만으로 FAILED 처리하는 것은 명백한 낭비입니다. Worker에 먼저
@@ -238,14 +238,13 @@ Limitation)로 관리**합니다.
 sequenceDiagram
     participant App as 애플리케이션
     participant W as Mock Worker
-
-    App->>W: ① POST /mock/auth/issue-key
-    W-->>App: API Key (Fail-Fast)
-    App->>W: ② POST /mock/process (X-API-KEY 헤더 포함)
-    W-->>App: workerJobId
+    App ->> W: ① POST /mock/auth/issue-key
+    W -->> App: API Key (Fail-Fast)
+    App ->> W: ② POST /mock/process (X-API-KEY 헤더 포함)
+    W -->> App: workerJobId
     loop 5초마다
-        App->>W: ③ GET /mock/process/{workerJobId}
-        W-->>App: status
+        App ->> W: ③ GET /mock/process/{workerJobId}
+        W -->> App: status
     end
 ```
 
@@ -262,15 +261,17 @@ sequenceDiagram
 
 Worker API는 상태 코드별로 다른 복구 전략을 적용합니다.
 
-| 상태 코드 | 의미 | 처리 방식 |
-|---------|------|---------|
-| `401 Unauthorized` | API Key 만료 | `ReentrantLock`으로 재발급 직렬화 후 재시도 (아래 섹션 참고) |
-| `429 Too Many Requests` | Worker 과부하 | 지수 백오프(exponential backoff) 후 재시도 |
-| `404 Not Found` | workerJobId 유실 | `WorkerJobLostException` 발생 → 폴링 스케줄러가 FAILED 처리 |
+| 상태 코드                   | 의미             | 처리 방식                                            |
+|-------------------------|----------------|--------------------------------------------------|
+| `401 Unauthorized`      | API Key 만료     | `ReentrantLock`으로 재발급 직렬화 후 재시도 (아래 섹션 참고)       |
+| `429 Too Many Requests` | Worker 과부하     | 지수 백오프(exponential backoff) 후 재시도                |
+| `404 Not Found`         | workerJobId 유실 | `WorkerJobLostException` 발생 → 폴링 스케줄러가 FAILED 처리 |
 
-**429 백오프를 선택한 이유**: Worker는 GPU 리소스가 한정된 외부 서비스입니다. 즉시 재시도하면 Worker 부하가 더 악화됩니다. 지수 백오프로 요청 간격을 늘려 Worker가 회복할 시간을 확보합니다.
+**429 백오프를 선택한 이유**: Worker는 GPU 리소스가 한정된 외부 서비스입니다. 즉시 재시도하면 Worker 부하가 더 악화됩니다. 지수 백오프로 요청 간격을 늘려 Worker가 회복할
+시간을 확보합니다.
 
-**404를 `WorkerJobLostException`으로 처리한 이유**: `workerJobId`가 존재하는데 Worker가 404를 반환한다면 Worker 측 데이터가 유실된 것입니다. 이는 일시적 오류(`5xx`)와 달리 재시도로 해결되지 않으므로 즉시 FAILED 전이가 적절합니다. 타임아웃 대기 없이 빠르게 실패 상태를 확정하여 클라이언트가 재제출 여부를 판단할 수 있게 합니다.
+**404를 `WorkerJobLostException`으로 처리한 이유**: `workerJobId`가 존재하는데 Worker가 404를 반환한다면 Worker 측 데이터가 유실된 것입니다. 이는
+일시적 오류(`5xx`)와 달리 재시도로 해결되지 않으므로 즉시 FAILED 전이가 적절합니다. 타임아웃 대기 없이 빠르게 실패 상태를 확정하여 클라이언트가 재제출 여부를 판단할 수 있게 합니다.
 
 ---
 
@@ -283,17 +284,16 @@ sequenceDiagram
     participant A as 스레드 A
     participant B as 스레드 B
     participant W as Mock Worker
-
-    A->>W: POST /mock/process
-    W-->>A: 401 Unauthorized
-    B->>W: POST /mock/process
-    W-->>B: 401 Unauthorized
-    A->>W: POST /mock/auth/issue-key
-    W-->>A: Key1 저장
-    B->>W: POST /mock/auth/issue-key
-    W-->>B: Key2 저장 (Key1 무효화)
-    A->>W: POST /mock/process (Key1 사용) ❌
-    Note over A,W: Key1은 이미 무효 — Key2가 현재 유효
+    A ->> W: POST /mock/process
+    W -->> A: 401 Unauthorized
+    B ->> W: POST /mock/process
+    W -->> B: 401 Unauthorized
+    A ->> W: POST /mock/auth/issue-key
+    W -->> A: Key1 저장
+    B ->> W: POST /mock/auth/issue-key
+    W -->> B: Key2 저장 (Key1 무효화)
+    A ->> W: POST /mock/process (Key1 사용) ❌
+    Note over A, W: Key1은 이미 무효 — Key2가 현재 유효
 ```
 
 `ReentrantLock`으로 재발급을 직렬화합니다. `tryLock()`으로 잠금을 시도해 성공한 첫 번째 스레드만 재발급을 수행하고, 나머지 스레드는 `lock()`으로 재발급 완료를 기다린 뒤
@@ -319,21 +319,17 @@ sequenceDiagram
     participant T2 as Thread-2
     participant W as Worker
     participant DB
-
     Note over S: T=0s 틱-1
-    S->>DB: findByStatus(PROCESSING) → [Job-A]
-    S->>T1: executor.execute(checkJobStatus(Job-A))
+    S ->> DB: findByStatus(PROCESSING) → [Job-A]
+    S ->> T1: executor.execute(checkJobStatus(Job-A))
     Note over T1: Worker HTTP 응답 대기 중...
-
     Note over S: T=5s 틱-2 (Thread-1 아직 save() 전)
-    S->>DB: findByStatus(PROCESSING) → [Job-A]
-    S->>T2: executor.execute(checkJobStatus(Job-A))
-
-    W-->>T1: COMPLETED
-    T1->>DB: save(Job-A, COMPLETED) ✓
+    S ->> DB: findByStatus(PROCESSING) → [Job-A]
+    S ->> T2: executor.execute(checkJobStatus(Job-A))
+    W -->> T1: COMPLETED
+    T1 ->> DB: save(Job-A, COMPLETED) ✓
     Note over T2: updatedAt 경과 > 5분
-    T2->>DB: save(Job-A, FAILED) ❌
-
+    T2 ->> DB: save(Job-A, FAILED) ❌
     Note over DB: 최종 상태: FAILED (Worker는 이미 COMPLETED)
 ```
 
@@ -361,16 +357,14 @@ sequenceDiagram
     participant OS as 이전 서버
     participant W as Worker
     participant DB
-
-    OS->>DB: INSERT Job-X (PENDING) ✓
-    OS->>W: startProcessing() → WJ-1 생성
+    OS ->> DB: INSERT Job-X (PENDING) ✓
+    OS ->> W: startProcessing() → WJ-1 생성
     Note over OS: save(PROCESSING, WJ-1) 직전 크래시 💥
     Note over DB: Job-X = PENDING
     Note over W: WJ-1 처리 중
-
     participant NS as 새 서버
-    NS->>DB: recoverPendingJobs() → Job-X 발견
-    NS->>W: registerToWorker() → WJ-2 생성 ❌
+    NS ->> DB: recoverPendingJobs() → Job-X 발견
+    NS ->> W: registerToWorker() → WJ-2 생성 ❌
     Note over W: WJ-1, WJ-2 동시 처리 중
 ```
 
