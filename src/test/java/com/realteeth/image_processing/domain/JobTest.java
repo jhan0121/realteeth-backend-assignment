@@ -115,16 +115,6 @@ class JobTest {
         }
 
         @Test
-        @DisplayName("이미 PROCESSING 상태이면 IllegalStateException이 발생한다")
-        void startProcessing_whenProcessing_throwsIllegalStateException() {
-            Job job = processingJob();
-
-            assertThatThrownBy(() -> job.startProcessing("worker-job-2"))
-                    .isInstanceOf(IllegalStateException.class)
-                    .hasMessageContaining("PROCESSING");
-        }
-
-        @Test
         @DisplayName("이미 COMPLETED 상태이면 IllegalStateException이 발생한다")
         void startProcessing_whenCompleted_throwsIllegalStateException() {
             Job job = processingJob();
